@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gouri Thailand - Go-to-Market Strategy</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Warm Neutrals & Gold -->
+    <!-- Application Structure Plan: A dashboard-centric SPA. The primary view is an interactive grid of clinic cards, filterable by location and tier. This task-oriented design allows users (e.g., sales managers) to immediately explore and segment targets. Clicking a card reveals detailed analysis in a modal, preventing information overload. Secondary information like market context and sales strategy is placed in collapsible accordions below the main dashboard. This structure prioritizes the user's primary goal—target identification and analysis—over the linear structure of the source report, creating a more efficient and intuitive user experience. -->
+    <!-- Visualization & Content Choices: The core data from the report's final matrix is presented as interactive clinic cards. Goal: Organize/Compare. Method: HTML/CSS Grid + JS Filtering. A donut chart visualizes target distribution by priority, and a bar chart shows competitor product prevalence. Goal: Inform/Compare. Method: Chart.js (Canvas), dynamically updated by filters. This provides at-a-glance insights. Detailed text is placed in modals and accordions. Goal: Inform. Method: JS show/hide. This keeps the main interface clean. All choices support the dashboard structure and enhance data exploration without using SVG or Mermaid. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FDFCF9;
+            color: #3D3D3D;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 350px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 320px;
+            }
+        }
+        .modal-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        .modal-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .modal-scrollbar::-webkit-scrollbar-thumb {
+            background: #C0A062;
+            border-radius: 10px;
+        }
+        .modal-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #a88a53;
+        }
+        .map-dot {
+            transition: all 0.3s ease;
+        }
+        .map-dot.active {
+            transform: scale(1.5);
+            box-shadow: 0 0 0 4px rgba(192, 160, 98, 0.5);
+        }
+        .filter-btn.active {
+            background-color: #C0A062;
+            color: #FFFFFF;
+            border-color: #C0A062;
+        }
+        .tier-badge {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .tier-1 { background-color: #C0A062; color: white; }
+        .tier-2 { background-color: #e5d9c3; color: #7a643b; }
+        .tier-3 { background-color: #f0ebe2; color: #8c7a5c; }
+        .priority-high { border-left: 4px solid #d97706; }
+        .priority-medium { border-left: 4px solid #f59e0b; }
+        .priority-low { border-left: 4px solid #fbbf24; }
+    </style>
+</head>
+<body class="antialiased">
+
+    <header class="bg-white/80 backdrop-blur-lg sticky top-0 z-40 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex items-center justify-between">
+                <h1 class="text-2xl font-bold text-gray-800">Gouri Thailand Market Strategy</h1>
+                <nav class="hidden md:flex items-center space-x-6">
+                    <a href="#dashboard" class="text-sm font-medium text-gray-600 hover:text-[#C0A062] transition">Target Dashboard</a>
+                    <a href="#market-context" class="text-sm font-medium text-gray-600 hover:text-[#C0A062] transition">Market Context</a>
+                    <a href="#sales-strategy" class="text-sm font-medium text-gray-600 hover:text-[#C0A062] transition">Sales Strategy</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+
+        <section id="dashboard" class="scroll-mt-20">
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Interactive Target Dashboard</h2>
+                <p class="mt-3 max-w-2xl mx-auto text-lg text-gray-500">Filter and explore potential distribution partners for Gouri in the Thai aesthetic market.</p>
+            </div>
+
+            <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div>
+                        <label for="location-filter" class="block text-sm font-medium text-gray-700 mb-2">Filter by Location</label>
+                        <div id="location-filter" class="flex flex-wrap gap-2">
+                            <button data-filter-group="location" data-filter-value="all" class="filter-btn active text-sm border border-gray-300 rounded-full px-4 py-1.5 hover:bg-gray-100 transition">All Thailand</button>
+                            <button data-filter-group="location" data-filter-value="Bangkok" class="filter-btn text-sm border border-gray-300 rounded-full px-4 py-1.5 hover:bg-gray-100 transition">Bangkok</button>
+                            <button data-filter-group="location" data-filter-value="Phuket" class="filter-btn text-sm border border-gray-300 rounded-full px-4 py-1.5 hover:bg-gray-100 transition">Phuket</button>
+                            <button data-filter-group="location" data-filter-value="Chiang Mai" class="filter-btn text-sm border border-gray-300 rounded-full px-4 py-1.5 hover:bg-gray-100 transition">Chiang Mai</button>
+                            <button data-filter-group="location" data-filter-value="Pattaya" class="filter-btn text-sm border border-gray-300 rounded-full px-4 py-1.5 hover:bg-gray-100 transition">Pattaya</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label for="tier-filter" class="block text-sm font-medium text-gray-700 mb-2">Filter by Target Tier</label>
+                        <div id="tier-filter" class="flex flex-wrap gap-2">
+                            <button data-filter-group="tier" data-filter-value="all" class="filter-btn active text-sm border border-gray-300 rounded-full px-4 py-1.5 hover:bg-gray-100 transition">All Tiers</button>
+                            <button data-filter-group="tier" data-filter-value="1" class="filter-btn text-sm border border-gray-300 rounded-full px-4 py-1.5 hover:bg-gray-100 transition">Tier 1</button>
+                            <button data-filter-group="tier" data-filter-value="2" class="filter-btn text-sm border border-gray-300 rounded-full px-4 py-1.5 hover:bg-gray-100 transition">Tier 2</button>
+                            <button data-filter-group="tier" data-filter-value="3" class="filter-btn text-sm border border-gray-300 rounded-full px-4 py-1.5 hover:bg-gray-100 transition">Tier 3</button>
+                        </div>
+                    </div>
+                     <div>
+                        <label for="priority-filter" class="block text-sm font-medium text-gray-700 mb-2">Filter by Priority</label>
+                        <div id="priority-filter" class="flex flex-wrap gap-2">
+                            <button data-filter-group="priority" data-filter-value="all" class="filter-btn active text-sm border border-gray-300 rounded-full px-4 py-1.5 hover:bg-gray-100 transition">All Priorities</button>
+                            <button data-filter-group="priority" data-filter-value="High" class="filter-btn text-sm border border-gray-300 rounded-full px-4 py-1.5 hover:bg-gray-100 transition">High</button>
+                            <button data-filter-group="priority" data-filter-value="Medium" class="filter-btn text-sm border border-gray-300 rounded-full px-4 py-1.5 hover:bg-gray-100 transition">Medium</button>
+                            <button data-filter-group="priority" data-filter-value="Low" class="filter-btn text-sm border border-gray-300 rounded-full px-4 py-1.5 hover:bg-gray-100 transition">Low</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+                <div class="bg-white rounded-xl shadow p-6 flex flex-col items-center justify-center text-center">
+                    <span class="text-5xl font-bold text-[#C0A062]" id="total-targets-stat">0</span>
+                    <p class="text-sm font-medium text-gray-500 mt-2">Total Targets Displayed</p>
+                </div>
+                <div class="bg-white rounded-xl shadow p-6 flex flex-col items-center justify-center text-center">
+                    <span class="text-5xl font-bold text-[#C0A062]" id="high-priority-stat">0</span>
+                    <p class="text-sm font-medium text-gray-500 mt-2">High Priority Targets</p>
+                </div>
+                <div class="bg-white rounded-xl shadow p-6 flex flex-col items-center justify-center text-center">
+                    <span class="text-5xl font-bold text-[#C0A062]" id="tier-1-stat">0</span>
+                    <p class="text-sm font-medium text-gray-500 mt-2">Tier 1 "Ready" Targets</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 xl:grid-cols-3 gap-8 mb-8">
+                <div class="xl:col-span-1 bg-white rounded-xl shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">Targets by Priority</h3>
+                     <div class="chart-container">
+                        <canvas id="priorityChart"></canvas>
+                    </div>
+                </div>
+                <div class="xl:col-span-2 bg-white rounded-xl shadow p-6">
+                    <h3 class="text-lg font-semibold text-gray-800 mb-4 text-center">Competitor Product Presence in Targets</h3>
+                    <div class="relative w-full mx-auto" style="height: 320px;">
+                        <canvas id="competitorChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div id="clinic-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            </div>
+             <p id="no-results" class="text-center text-gray-500 py-12 hidden">No clinics match the selected filters.</p>
+        </section>
+
+        <section id="market-context" class="scroll-mt-20 mt-16">
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Market Context</h2>
+                <p class="mt-3 max-w-2xl mx-auto text-lg text-gray-500">Understanding the Thai aesthetic market landscape for Gouri.</p>
+            </div>
+            <div class="space-y-4">
+                <div class="accordion-item bg-white rounded-xl shadow-sm">
+                    <button class="accordion-header w-full flex justify-between items-center text-left p-5 font-semibold text-lg text-gray-800">
+                        <span>The "Early Adopter" Clinic Profile</span>
+                        <span class="accordion-icon transform transition-transform duration-300">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </span>
+                    </button>
+                    <div class="accordion-content max-h-0 overflow-hidden transition-max-height duration-500 ease-in-out">
+                        <div class="p-5 pt-0 text-gray-600">
+                            <p class="mb-4">Based on existing partnerships, the ideal clinic for Gouri exhibits several key traits that signal a readiness to adopt and successfully market advanced biostimulatory products.</p>
+                            <ul class="list-disc list-inside space-y-2">
+                                <li><strong>Sophisticated Service Portfolio:</strong> Differentiates between HA fillers and collagen stimulators, indicating an advanced understanding of the market.</li>
+                                <li><strong>Focus on Innovation & Education:</strong> Actively promotes new technologies and educates patients on the science behind treatments.</li>
+                                <li><strong>Established Expertise in Injectables:</strong> Possesses deep technical skill and anatomical knowledge from a broad practice in traditional injectables.</li>
+                                <li><strong>Premium Market Positioning:</strong> Targets a discerning clientele that values quality, safety, and natural, long-term results.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                 <div class="accordion-item bg-white rounded-xl shadow-sm">
+                    <button class="accordion-header w-full flex justify-between items-center text-left p-5 font-semibold text-lg text-gray-800">
+                        <span>Competitive Biostimulator Ecosystem</span>
+                        <span class="accordion-icon transform transition-transform duration-300">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </span>
+                    </button>
+                    <div class="accordion-content max-h-0 overflow-hidden transition-max-height duration-500 ease-in-out">
+                        <div class="p-5 pt-0 text-gray-600">
+                            <p class="mb-4">Gouri enters an established market for collagen biostimulators. Understanding the key players is crucial for crafting a compelling and differentiated value proposition.</p>
+                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div><strong>Sculptra (PLLA):</strong> The most entrenched competitor, setting the benchmark for gradual, long-lasting results. Its presence indicates a top-tier clinic.</div>
+                                <div><strong>Radiesse (CaHA):</strong> A hybrid product offering both immediate volume and long-term collagen stimulation.</div>
+                                <div><strong>Juvelook (PDLLA + HA):</strong> A newer entrant combining hydration with collagenesis, signaling a market appetite for hybrid formulations.</div>
+                                <div><strong>Profhilo (High-Conc. HA):</strong> A "bio-remodeling" agent focused on hydration and improving skin laxity, competing on overall skin rejuvenation.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="sales-strategy" class="scroll-mt-20 mt-16">
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">Strategic Sales Engagement</h2>
+                <p class="mt-3 max-w-2xl mx-auto text-lg text-gray-500">Tailored approaches for engaging each tier of potential partners.</p>
+            </div>
+            <div class="space-y-4">
+                <div class="accordion-item bg-white rounded-xl shadow-sm">
+                    <button class="accordion-header w-full flex justify-between items-center text-left p-5 font-semibold text-lg text-gray-800">
+                        <span>Tier 1: Biostimulator-Ready Experts</span>
+                         <span class="accordion-icon transform transition-transform duration-300">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </span>
+                    </button>
+                    <div class="accordion-content max-h-0 overflow-hidden transition-max-height duration-500 ease-in-out">
+                        <div class="p-5 pt-0 text-gray-600">
+                            <p><strong>Approach:</strong> Peer-to-peer, science-driven dialogue.</p>
+                            <p><strong>Action Plan:</strong> Provide comprehensive clinical data, white papers, and case studies. Arrange workshops with Key Opinion Leaders (KOLs). The goal is to prove Gouri's unique clinical advantages (liquid PCL, ease of use, uniform spread) over their existing PLLA and CaHA offerings. Offer an introductory package for internal trials to secure commitment.</p>
+                        </div>
+                    </div>
+                </div>
+                 <div class="accordion-item bg-white rounded-xl shadow-sm">
+                    <button class="accordion-header w-full flex justify-between items-center text-left p-5 font-semibold text-lg text-gray-800">
+                        <span>Tier 2: Injectable Powerhouses</span>
+                         <span class="accordion-icon transform transition-transform duration-300">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </span>
+                    </button>
+                    <div class="accordion-content max-h-0 overflow-hidden transition-max-height duration-500 ease-in-out">
+                        <div class="p-5 pt-0 text-gray-600">
+                            <p><strong>Approach:</strong> Focus on the commercial opportunity and portfolio expansion.</p>
+                            <p><strong>Action Plan:</strong> Develop a turnkey "Gouri Biostimulator Launch Package." This business solution should include hands-on training, patient-facing marketing materials, and a clear Return on Investment (ROI) projection. Frame the sale as a strategic partnership to help them capture a new, high-margin market segment.</p>
+                        </div>
+                    </div>
+                </div>
+                 <div class="accordion-item bg-white rounded-xl shadow-sm">
+                    <button class="accordion-header w-full flex justify-between items-center text-left p-5 font-semibold text-lg text-gray-800">
+                        <span>Tier 3: Strategic Hospitals & Niche Clinics</span>
+                         <span class="accordion-icon transform transition-transform duration-300">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                        </span>
+                    </button>
+                    <div class="accordion-content max-h-0 overflow-hidden transition-max-height duration-500 ease-in-out">
+                        <div class="p-5 pt-0 text-gray-600">
+                            <p><strong>Approach:</strong> Formal, patient-centric, and data-heavy.</p>
+                            <p><strong>Action Plan:</strong> For major hospitals, submit a formal proposal to department heads focusing on safety, efficacy, and regulatory compliance (Thai FDA). Include extensive clinical trial data. For niche clinics, tailor the pitch to their specific clientele (e.g., emphasizing subtle, natural results for an expat-focused clinic).</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <div id="clinic-modal" class="fixed inset-0 bg-black bg-opacity-60 hidden items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col transform transition-all duration-300 scale-95 opacity-0">
+            <div class="flex justify-between items-center p-5 border-b">
+                <h2 id="modal-title" class="text-2xl font-bold text-gray-800"></h2>
+                <button id="close-modal-btn" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div id="modal-content" class="p-6 overflow-y-auto modal-scrollbar space-y-6">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const clinicData = [
+                { id: 1, name: "Nirunda Int'l Aesthetic Clinic", location: "Bangkok", tier: 1, competitors: ["Gouri", "Sculptra", "Radiesse", "Profhilo"], clientele: "Elite Local, International", priority: "High", notes: "Existing partner. Focus on strengthening relationship, co-marketing, and establishing as a KOL center." },
+                { id: 2, name: "WIH International Hospital", location: "Bangkok", tier: 1, competitors: ["Sculptra", "Radiesse"], clientele: "Affluent Local, Medical Tourist", priority: "High", notes: "Pitch Gouri's liquid PCL as a unique modality for diffuse skin quality improvement vs. PLLA/CaHA." },
+                { id: 3, name: "SKNN Clinic Bangkok", location: "Bangkok", tier: 1, competitors: ["Sculptra", "Juvelook"], clientele: "Discerning Local, Expat", priority: "High", notes: "Align with 'less is more' philosophy. Position as the ultimate treatment for a natural, 'glowing from the inside' result." },
+                { id: 4, name: "MedConsult Clinic", location: "Bangkok", tier: 1, competitors: ["Sculptra", "Juvelook", "Profhilo"], clientele: "Expat, Elite Local, Tourist", priority: "High", notes: "Position as the newest, premium addition to their elite skin revitalization menu for a discerning international audience." },
+                { id: 5, name: "KKC Clinic (Chain)", location: "Bangkok", tier: 2, competitors: ["Sculptra", "Skin Boosters"], clientele: "Affluent Mass Market", priority: "High", notes: "Strategic opportunity for scale. Pitch a corporate partnership for portfolio expansion across multiple prime locations." },
+                { id: 6, name: "Siam Clinic Phuket", location: "Phuket", tier: 1, competitors: ["Sculptra", "Premium HA Fillers"], clientele: "Medical Tourist, Expat, Local", priority: "High", notes: "Ideal anchor client for Southern Thailand. Leverage their focus on premium, award-winning injectable services." },
+                { id: 7, name: "Chiang Mai Wellness Clinic", location: "Chiang Mai", tier: 1, competitors: ["Sculptra", "Juvelook"], clientele: "Expat, Wellness Tourist", priority: "High", notes: "Ideal anchor client for Northern Thailand. Already deeply invested in the biostimulator and skin booster categories." },
+                { id: 8, name: "BSL Clinic", location: "Bangkok", tier: 2, competitors: ["Ulthera", "Thermage", "HA Fillers"], clientele: "Local, Medical Tourist", priority: "Medium", notes: "Introduce as the injectable evolution of their technology-based collagen stimulation. A logical next step for their practice." },
+                { id: 9, name: "Metro Bangkok Clinic", location: "Bangkok", tier: 2, competitors: ["HIFU", "Thermage", "PRP", "HA Fillers"], clientele: "Expat, International", priority: "Medium", notes: "Position as a more advanced and predictable alternative or complement to their existing PRP and HIFU treatments." },
+                { id: 10, name: "Bumrungrad Int'l Hospital", location: "Bangkok", tier: 3, competitors: ["Premium HA Fillers", "Botox"], clientele: "Elite Local, Medical Tourist", priority: "Medium", notes: "Long-term credibility play. Requires a formal, data-heavy approach to the hospital's procurement process." },
+                { id: 11, name: "Aura Bangkok Clinic", location: "Bangkok", tier: 2, competitors: ["Sculptra", "Ulthera", "Thermage"], clientele: "Broad Demographic (Young & Old)", priority: "Medium", notes: "Strong Sculptra user. Pitch Gouri as a complementary PCL-based option for different patient needs (e.g., full-face glow)." },
+                { id: 12, name: "Boston Health Polyclinic", location: "Chiang Mai", tier: 2, competitors: ["Botox", "HA Fillers"], clientele: "Expat, Local", priority: "Medium", notes: "Strong injectable clinic ready to be educated on the benefits of biostimulation for their established expat client base." },
+                { id: 13, name: "NK Clinic Phuket", location: "Phuket", tier: 2, competitors: ["Thread Lift", "HA Fillers", "Botox"], clientele: "Local, Tourist", priority: "Medium", notes: "Introduce as a new anti-aging category beyond their current injectable offerings to enhance their 'most experienced' positioning." },
+                { id: 14, name: "SEA Aesthetic And Wellness", location: "Pattaya", tier: 2, competitors: ["Ulthera", "Premium HA Fillers"], clientele: "Expat, Local", priority: "Medium", notes: "Leverage their focus on premium US/EU brands; position Gouri as a cutting-edge addition to this exclusive category." },
+                { id: 15, name: "Bangkok Hospital Pattaya", location: "Pattaya", tier: 3, competitors: ["Juvéderm", "Restylane", "Botox"], clientele: "Local, Expat, Tourist", priority: "Low", notes: "Regional hospital opportunity. A credibility win, but likely to have a slower adoption cycle than private clinics." }
+            ];
+
+            const clinicGrid = document.getElementById('clinic-grid');
+            const noResultsEl = document.getElementById('no-results');
+            const filters = { location: 'all', tier: 'all', priority: 'all' };
+            
+            let priorityChart, competitorChart;
+
+            function createPriorityChart(data) {
+                const ctx = document.getElementById('priorityChart').getContext('2d');
+                const priorityCounts = data.reduce((acc, clinic) => {
+                    acc[clinic.priority] = (acc[clinic.priority] || 0) + 1;
+                    return acc;
+                }, {});
+
+                const chartData = {
+                    labels: Object.keys(priorityCounts),
+                    datasets: [{
+                        data: Object.values(priorityCounts),
+                        backgroundColor: ['#d97706', '#f59e0b', '#fbbf24'],
+                        borderColor: '#FDFCF9',
+                        borderWidth: 4,
+                    }]
+                };
+
+                if (priorityChart) priorityChart.destroy();
+                priorityChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: chartData,
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '60%',
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    boxWidth: 15,
+                                    padding: 20
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            function createCompetitorChart(data) {
+                const ctx = document.getElementById('competitorChart').getContext('2d');
+                const competitorCounts = data.flatMap(c => c.competitors).reduce((acc, comp) => {
+                    if (comp !== 'Gouri') {
+                        acc[comp] = (acc[comp] || 0) + 1;
+                    }
+                    return acc;
+                }, {});
+
+                const sortedCompetitors = Object.entries(competitorCounts).sort(([,a],[,b]) => b-a);
+
+                const chartData = {
+                    labels: sortedCompetitors.map(item => item[0]),
+                    datasets: [{
+                        label: 'Number of Clinics',
+                        data: sortedCompetitors.map(item => item[1]),
+                        backgroundColor: '#C0A062',
+                        borderRadius: 5,
+                        barThickness: 20,
+                    }]
+                };
+
+                if (competitorChart) competitorChart.destroy();
+                competitorChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: chartData,
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `Present in ${context.raw} target clinics`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                beginAtZero: true,
+                                grid: { display: false },
+                                ticks: {
+                                    stepSize: 1
+                                }
+                            },
+                            y: {
+                                grid: { display: false }
+                            }
+                        }
+                    }
+                });
+            }
+
+            function renderClinics() {
+                clinicGrid.innerHTML = '';
+                const filteredData = clinicData.filter(clinic => {
+                    const locationMatch = filters.location === 'all' || clinic.location === filters.location;
+                    const tierMatch = filters.tier === 'all' || clinic.tier.toString() === filters.tier;
+                    const priorityMatch = filters.priority === 'all' || clinic.priority === filters.priority;
+                    return locationMatch && tierMatch && priorityMatch;
+                });
+
+                if (filteredData.length === 0) {
+                    noResultsEl.classList.remove('hidden');
+                } else {
+                    noResultsEl.classList.add('hidden');
+                }
+
+                filteredData.forEach(clinic => {
+                    const card = document.createElement('div');
+                    card.className = `clinic-card bg-white rounded-xl shadow p-5 cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 priority-${clinic.priority.toLowerCase()}`;
+                    card.dataset.clinicId = clinic.id;
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start">
+                            <h3 class="font-bold text-lg text-gray-800 pr-2">${clinic.name}</h3>
+                            <span class="tier-badge tier-${clinic.tier}">Tier ${clinic.tier}</span>
+                        </div>
+                        <p class="text-sm text-gray-500 mt-1">${clinic.location}</p>
+                        <div class="mt-4 pt-4 border-t border-gray-100">
+                            <p class="text-xs font-semibold text-gray-400 uppercase mb-2">Key Competitors</p>
+                            <div class="flex flex-wrap gap-1.5">
+                                ${clinic.competitors.map(c => `<span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">${c}</span>`).join('')}
+                            </div>
+                        </div>
+                    `;
+                    card.addEventListener('click', () => openModal(clinic.id));
+                    clinicGrid.appendChild(card);
+                });
+
+                updateStats(filteredData);
+                createPriorityChart(filteredData);
+                createCompetitorChart(filteredData);
+            }
+
+            function updateStats(data) {
+                document.getElementById('total-targets-stat').textContent = data.length;
+                document.getElementById('high-priority-stat').textContent = data.filter(c => c.priority === 'High').length;
+                document.getElementById('tier-1-stat').textContent = data.filter(c => c.tier === 1).length;
+            }
+
+            document.querySelectorAll('.filter-btn').forEach(button => {
+                button.addEventListener('click', () => {
+                    const group = button.dataset.filterGroup;
+                    const value = button.dataset.filterValue;
+                    filters[group] = value;
+
+                    document.querySelectorAll(`button[data-filter-group="${group}"]`).forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    
+                    renderClinics();
+                });
+            });
+
+            const modal = document.getElementById('clinic-modal');
+            const modalContainer = modal.querySelector('div');
+            const modalTitle = document.getElementById('modal-title');
+            const modalContent = document.getElementById('modal-content');
+            const closeModalBtn = document.getElementById('close-modal-btn');
+
+            function openModal(clinicId) {
+                const clinic = clinicData.find(c => c.id === clinicId);
+                if (!clinic) return;
+
+                modalTitle.textContent = clinic.name;
+                modalContent.innerHTML = `
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                        <div class="bg-gray-50 rounded-lg p-3">
+                            <p class="text-sm font-semibold text-gray-500">Location</p>
+                            <p class="text-lg font-bold text-[#C0A062]">${clinic.location}</p>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-3">
+                            <p class="text-sm font-semibold text-gray-500">Target Tier</p>
+                            <p class="text-lg font-bold text-[#C0A062]">Tier ${clinic.tier}</p>
+                        </div>
+                        <div class="bg-gray-50 rounded-lg p-3">
+                            <p class="text-sm font-semibold text-gray-500">Priority</p>
+                            <p class="text-lg font-bold text-[#C0A062]">${clinic.priority}</p>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-gray-700 text-lg mb-2">Strategic Notes</h4>
+                        <p class="text-gray-600 bg-amber-50 border-l-4 border-amber-400 p-4 rounded-r-lg">${clinic.notes}</p>
+                    </div>
+                     <div>
+                        <h4 class="font-semibold text-gray-700 text-lg mb-2">Primary Clientele</h4>
+                        <p class="text-gray-600">${clinic.clientele}</p>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-gray-700 text-lg mb-2">Key Competing Products Offered</h4>
+                        <div class="flex flex-wrap gap-2">
+                            ${clinic.competitors.map(c => `<span class="text-sm bg-gray-100 text-gray-700 px-3 py-1 rounded-full font-medium">${c}</span>`).join('')}
+                        </div>
+                    </div>
+                `;
+
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                setTimeout(() => {
+                    modalContainer.classList.remove('scale-95', 'opacity-0');
+                }, 10);
+            }
+
+            function closeModal() {
+                modalContainer.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                }, 300);
+            }
+
+            closeModalBtn.addEventListener('click', closeModal);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeModal();
+                }
+            });
+
+            document.querySelectorAll('.accordion-header').forEach(button => {
+                button.addEventListener('click', () => {
+                    const content = button.nextElementSibling;
+                    const icon = button.querySelector('.accordion-icon');
+                    
+                    button.parentElement.classList.toggle('open');
+                    icon.classList.toggle('rotate-180');
+
+                    if (content.style.maxHeight) {
+                        content.style.maxHeight = null;
+                    } else {
+                        content.style.maxHeight = content.scrollHeight + "px";
+                    }
+                });
+            });
+
+            renderClinics();
+        });
+    </script>
+</body>
+</html>
